@@ -12,7 +12,7 @@ interface Property {
 }
 
 export default function EditPropertyPage({ params }: { params: { id: string } }) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
   const [formData, setFormData] = useState<Property>({
     id: "",
@@ -24,18 +24,25 @@ export default function EditPropertyPage({ params }: { params: { id: string } })
   const [error, setError] = useState("")
 
   useEffect(() => {
-    fetchProperty()
-  }, [params.id])
+    if (status === "unauthenticated") {
+      router.push("/auth/login")
+    } else if (status === "authenticated") {
+      fetchProperty()
+    }
+  }, [status, params.id])
 
   const fetchProperty = async () => {
     try {
       const response = await fetch(`/api/properties/${params.id}`)
-      if (response.ok) {
+      if (!response.ok) {
         const data = await response.json()
-        setFormData(data)
+        throw new Error(data.message || "Failed to fetch property")
       }
+      const data = await response.json()
+      setFormData(data)
     } catch (error) {
       console.error("Error fetching property:", error)
+      setError(error instanceof Error ? error.message : "Failed to fetch property")
     } finally {
       setLoading(false)
     }
@@ -68,10 +75,29 @@ export default function EditPropertyPage({ params }: { params: { id: string } })
     }
   }
 
-  if (loading) {
+  if (status === "loading" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h3 className="text-lg font-medium text-gray-900">Error</h3>
+          <p className="mt-2 text-sm text-gray-500">{error}</p>
+          <div className="mt-6">
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
